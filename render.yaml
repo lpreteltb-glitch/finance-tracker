@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: finance-tracker
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/categories
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false # optional; Render asks for the value at deploy time

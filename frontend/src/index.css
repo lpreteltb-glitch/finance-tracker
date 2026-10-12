@@ -1,0 +1,76 @@
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --hairline: #e1e0d9;
+  --baseline: #c3c2b7;
+  --bar: #2a78d6;
+  --bar-dim: #86b6ef;
+  --good: #006300;
+  --bad: #d03b3b;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --ink: #ffffff;
+    --ink-2: #c3c2b7;
+    --hairline: #2c2c2a;
+    --baseline: #383835;
+    --bar: #3987e5;
+    --bar-dim: #184f95;
+    --good: #0ca30c;
+    --bad: #e66767;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d;
+  --surface: #1a1a19;
+  --ink: #ffffff;
+  --ink-2: #c3c2b7;
+  --hairline: #2c2c2a;
+  --baseline: #383835;
+  --bar: #3987e5;
+  --bar-dim: #184f95;
+  --good: #0ca30c;
+  --bad: #e66767;
+}
+
+body { margin: 0; background: var(--page); color: var(--ink); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 860px; margin: 2rem auto; padding: 0 16px; }
+.muted { color: var(--muted); }
+.neg { color: var(--bad); }
+.pos { color: var(--good); }
+.num { font-variant-numeric: tabular-nums; text-align: right; }
+
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; font-weight: 600; color: var(--ink-2); }
+td, th { padding: 4px 6px; }
+tbody tr { border-top: 1px solid var(--hairline); }
+
+.filters { display: flex; gap: 12px; align-items: center; margin: 1rem 0; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.card { background: var(--surface); border: 1px solid var(--hairline); border-radius: 8px; padding: 16px; }
+.card h2 { font-size: 14px; font-weight: 600; margin: 0 0 12px; color: var(--ink-2); }
+.tile-value { font-size: 28px; font-weight: 600; margin: 4px 0; }
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; margin: 12px 0; }
+
+/* Horizontal bars: one series, square at the baseline, 4px rounded tip, value at the tip. */
+.hbar { display: grid; grid-template-columns: 110px 1fr; align-items: center; gap: 8px; margin: 6px 0; font-size: 13px; }
+.hbar-track { display: flex; align-items: center; gap: 6px; border-left: 1px solid var(--baseline); }
+.hbar-fill { height: 16px; background: var(--bar); border-radius: 0 4px 4px 0; }
+.hbar:hover .hbar-fill { filter: brightness(1.15); }
+
+/* Columns: selected month at full strength, others dimmed; click a column to select its month. */
+.cols { display: flex; align-items: flex-end; height: 170px; border-bottom: 1px solid var(--baseline); }
+.col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; background: none; border: 0; padding: 0 4px; cursor: pointer; font: inherit; font-size: 12px; color: var(--ink-2); }
+.col-fill { width: 24px; background: var(--bar-dim); border-radius: 4px 4px 0 0; margin-top: 4px; }
+.col[aria-pressed="true"] .col-fill { background: var(--bar); }
+.col:hover .col-fill, .col:focus-visible .col-fill { filter: brightness(1.15); }
+.col-labels { display: flex; text-align: center; font-size: 12px; color: var(--muted); margin-top: 4px; }
+.col-labels span { flex: 1; }
