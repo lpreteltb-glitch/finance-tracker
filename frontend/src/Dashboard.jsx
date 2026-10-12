@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { money } from "./format.js";
+import { displayName, money } from "./format.js";
 
 const monthName = (m, opts = { month: "short", year: "numeric" }) =>
   new Date(`${m}-01T00:00`).toLocaleString("en-US", opts);
@@ -22,32 +22,30 @@ export default function Dashboard({ version }) {
 
   return (
     <section aria-label="Spending dashboard">
-      <div className="filters">
-        <label>
-          Month{" "}
-          <select value={data.month} onChange={(e) => setMonth(e.target.value)}>
-            {data.months.map((m) => <option key={m} value={m}>{monthName(m, { month: "long", year: "numeric" })}</option>)}
-          </select>
-        </label>
+      <div className="section-head">
+        <h1>Overview</h1>
+        <select aria-label="Month" value={data.month} onChange={(e) => setMonth(e.target.value)}>
+          {data.months.map((m) => <option key={m} value={m}>{monthName(m, { month: "long", year: "numeric" })}</option>)}
+        </select>
       </div>
 
       <div className="tiles">
         <div className="card">
-          <div className="muted">Spent</div>
+          <div className="tile-label">Spent</div>
           <div className="tile-value">{money(current.spent)}</div>
           {change !== null && (
             // Spending going up is bad, so up is red and down is green; the arrow and words carry it without color.
-            <small className={change > 0 ? "neg" : "pos"}>
+            <small className={`delta ${change > 0 ? "neg" : "pos"}`}>
               {change > 0 ? "▲" : "▼"} {Math.abs(change * 100).toFixed(0)}% vs {monthName(prev.month)}
             </small>
           )}
         </div>
         <div className="card">
-          <div className="muted">Income</div>
+          <div className="tile-label">Income</div>
           <div className="tile-value">{money(current.income)}</div>
         </div>
         <div className="card">
-          <div className="muted">Net</div>
+          <div className="tile-label">Net</div>
           <div className="tile-value">{money(current.income - current.spent)}</div>
         </div>
       </div>
@@ -95,7 +93,7 @@ export default function Dashboard({ version }) {
           <thead><tr><th>Merchant</th><th className="num">Visits</th><th className="num">Spent</th></tr></thead>
           <tbody>
             {data.top_merchants.map((m) => (
-              <tr key={m.merchant}><td>{m.merchant}</td><td className="num">{m.count}</td><td className="num">{money(m.total)}</td></tr>
+              <tr key={m.merchant}><td>{displayName(m.merchant)}</td><td className="num">{m.count}</td><td className="num">{money(m.total)}</td></tr>
             ))}
           </tbody>
         </table>
