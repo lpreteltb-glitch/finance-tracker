@@ -181,3 +181,69 @@ def test_sample_data_is_fully_categorized_by_rules(client):
     assert client.post("/api/sample").json()["imported"] > 30
     assert client.asked == []  # sample needs no AI calls
     assert {t["source"] for t in client.get("/api/transactions").json()} == {"rule"}
+
+
+# --- Plaid (no network: a fake API stands in for Plaid's sandbox) ---
+from datetime import date
+
+import plaid_bank
+
+
+def txn(name, amount, primary=None, detailed=None, merchant=None, pending=False):
+    pfc = {"primary": primary, "detailed": detailed or ""} if primary else None
+    return {"date": date(2026, 1, 5), "name": name, "merchant_name": merchant, "amount": amount,
+            "pending": pending, "personal_finance_category": pfc}
+
+
+class FakePlaid:
+    def __init__(self, pages):
+        self.pages, self.cursors = pages, []
+
+    def item_public_token_exchange(self, req):
+        assert req["public_token"] == "public-sandbox-123"
+        return {"access_token": "access-sandbox-xyz"}
+
+    def transactions_sync(self, req):
+        self.cursors.append(req.get("cursor"))
+        return self.pages.pop(0)
+
+
+def test_fetch_transactions_pages_waits_and_converts():
+    api = FakePlaid([
+        {"added": [], "has_more": False, "next_cursor": "c0", "transactions_update_status": "NOT_READY"},
+        {"added": [txn("SQ *WHOLE FDS", 42.5, "FOOD_AND_DRINK", "FOOD_AND_DRINK_GROCERIES", merchant="Whole Foods")],
+         "has_more": True, "next_cursor": "c1", "transactions_update_status": "INITIAL_UPDATE_COMPLETE"},
+        {"added": [txn("GUSTO PAY", -1500, "INCOME"), txn("PENDING THING", 3, "TRAVEL", pending=True),
+                   txn("MYSTERY CO", 9.99)],
+         "has_more": False, "next_cursor": "c2", "transactions_update_status": "HISTORICAL_UPDATE_COMPLETE"},
+    ])
+    rows = plaid_bank.fetch_transactions("public-sandbox-123", api=api, wait=0)
+    assert rows == [
+        ("2026-01-05", "Whole Foods", -42.5, "Groceries"),  # merchant name preferred, detailed category wins
+        ("2026-01-05", "GUSTO PAY", 1500, "Income"),        # Plaid's negative = money in
+        ("2026-01-05", "MYSTERY CO", -9.99, None),          # no Plaid category -> our own tiers decide
+    ]
+    assert api.cursors == [None, "c0", "c1"]
+
+
+def test_plaid_disabled_returns_503(client, monkeypatch):
+    monkeypatch.delenv("PLAID_CLIENT_ID", raising=False)
+    assert client.get("/api/plaid/status").json() == {"enabled": False}
+    assert client.post("/api/plaid/link_token").status_code == 503
+
+
+def test_plaid_exchange_imports_with_bank_categories(client, monkeypatch):
+    monkeypatch.setattr(plaid_bank, "enabled", lambda: True)
+    monkeypatch.setattr(plaid_bank, "fetch_transactions", lambda tok: [
+        ("2026-01-05", "Whole Foods", -42.5, "Groceries"),
+        ("2026-01-06", "MYSTERY CO", -9.99, None),
+    ])
+    assert client.post("/api/plaid/exchange", json={"public_token": "p"}).json() == {"imported": 2}
+    t = by_desc(client)
+    assert (t["Whole Foods"]["category"], t["Whole Foods"]["source"]) == ("Groceries", "bank")
+    assert (t["MYSTERY CO"]["category"], t["MYSTERY CO"]["source"]) == ("Other", "default")
+
+    # Your own correction still beats the bank's category next time.
+    client.patch(f"/api/transactions/{t['Whole Foods']['id']}", json={"category": "Shopping"})
+    client.post("/api/plaid/exchange", json={"public_token": "p"})
+    assert [x["category"] for x in client.get("/api/transactions").json() if x["description"] == "Whole Foods"] == ["Shopping", "Shopping"]

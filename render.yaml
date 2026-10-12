@@ -7,3 +7,7 @@ services:
     envVars:
       - key: ANTHROPIC_API_KEY
         sync: false # optional; Render asks for the value at deploy time
+      - key: PLAID_CLIENT_ID
+        sync: false # from dashboard.plaid.com → Developers → Keys (Sandbox)
+      - key: PLAID_SECRET
+        sync: false

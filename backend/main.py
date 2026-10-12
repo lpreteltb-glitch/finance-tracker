@@ -1,5 +1,6 @@
 import csv
 import io
+import json
 import os
 import secrets
 import sqlite3
@@ -9,8 +10,11 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response, UploadFile
 from fastapi.staticfiles import StaticFiles
+from plaid import ApiException
 from pydantic import BaseModel
+from urllib3.exceptions import HTTPError
 
+import plaid_bank
 from categorize import CATEGORIES, ai_categories, merchant_key, rule_category
 
 DB_PATH = os.environ.get("DB_PATH", "finance.db")
@@ -100,15 +104,18 @@ def parse_csv(text):
 
 
 def import_rows(owner, rows):
+    """rows are (date, description, amount) or, from a bank connection, (date, description, amount, bank_category)."""
     with db() as conn:
         learned = {r["merchant"]: r["category"] for r in conn.execute("SELECT * FROM rules WHERE owner = ?", (owner,))}
 
-    # Priority: your past corrections, then keyword rules, then Claude, then a default so nothing is left blank.
+    # Priority: your past corrections, the bank's own category, keyword rules, Claude, then a default.
     labeled = []
-    for date, desc, amount in rows:
+    for date, desc, amount, *bank_category in rows:
         key = merchant_key(desc)
         if key in learned:
             labeled.append([owner, date, desc, amount, key, learned[key], "learned"])
+        elif bank_category and bank_category[0]:
+            labeled.append([owner, date, desc, amount, key, bank_category[0], "bank"])
         elif cat := rule_category(desc):
             labeled.append([owner, date, desc, amount, key, cat, "rule"])
         else:
@@ -226,6 +233,49 @@ def summary(owner: Owner, month: str | None = None):
         "by_category": [dict(r) for r in by_category],
         "top_merchants": [dict(r) for r in top_merchants],
     }
+
+
+@app.get("/api/plaid/status")
+def plaid_status():
+    return {"enabled": plaid_bank.enabled()}
+
+
+def plaid_message(e):
+    try:
+        return json.loads(e.body)["error_message"]
+    except (TypeError, ValueError, KeyError):
+        return e.reason
+
+
+def require_plaid():
+    if not plaid_bank.enabled():
+        raise HTTPException(503, "bank connections are not configured on this server")
+
+
+@app.post("/api/plaid/link_token", dependencies=[Depends(require_plaid)])
+def plaid_link_token(owner: Owner):
+    try:
+        return {"link_token": plaid_bank.link_token(owner)}
+    except ApiException as e:
+        raise HTTPException(502, f"Plaid error: {plaid_message(e)}")
+    except HTTPError:
+        raise HTTPException(502, "could not reach Plaid")
+
+
+class PublicToken(BaseModel):
+    public_token: str
+
+
+@app.post("/api/plaid/exchange", dependencies=[Depends(require_plaid)])
+def plaid_exchange(body: PublicToken, owner: Owner):
+    """Called by the browser after the user picks a bank in Plaid Link; imports that account's transactions."""
+    try:
+        rows = plaid_bank.fetch_transactions(body.public_token)
+    except ApiException as e:
+        raise HTTPException(502, f"Plaid error: {plaid_message(e)}")
+    except HTTPError:
+        raise HTTPException(502, "could not reach Plaid")
+    return import_rows(owner, rows)
 
 
 # In production the built React app is served from here, so frontend and API share one URL. Must stay last.

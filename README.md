@@ -4,11 +4,14 @@
 
 Upload bank CSV exports (Chase, BofA, Capital One-style formats) and see your transactions, auto-categorized.
 
+**Bank connection (Plaid test mode):** *Connect a bank* opens Plaid Link; sign in to any test bank with `user_good` / `pass_good` and its transactions are imported. Set `PLAID_CLIENT_ID` and `PLAID_SECRET` (Sandbox keys from [dashboard.plaid.com](https://dashboard.plaid.com)) to enable it; without them the button is hidden.
+
 **Categorization**, in priority order:
 1. **Your corrections:** change a category once and every past and future charge from that merchant follows.
-2. **Keyword rules** (`backend/categorize.py`).
-3. **Claude** labels whatever the rules miss, in one batched call per upload (optional: set `ANTHROPIC_API_KEY`).
-4. **Default:** anything still unlabeled becomes *Income* (money in) or *Other* (money out), so every transaction always has a category.
+2. **The bank's category** (Plaid's personal finance category, for connected banks).
+3. **Keyword rules** (`backend/categorize.py`).
+4. **Claude** labels whatever the rules miss, in one batched call per upload (optional: set `ANTHROPIC_API_KEY`).
+5. **Default:** anything still unlabeled becomes *Income* (money in) or *Other* (money out), so every transaction always has a category.
 
 Each browser gets its own private data (a random cookie id), so visitors to a public deploy never see each other's transactions.
 
