@@ -1,5 +1,7 @@
 # Finance Tracker
 
+**Live demo:** https://finance-tracker-8rz6.onrender.com (click *Load sample data*; first load can take ~1 min while the free server wakes up)
+
 Upload bank CSV exports (Chase, BofA, Capital One-style formats) and see your transactions, auto-categorized.
 
 **Categorization**, in priority order:
